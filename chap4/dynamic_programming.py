@@ -16,7 +16,7 @@ class PolicyIteration:
         self.gamma = gamma
         self.state_num = self.env.ncol * self.env.nrow  # 状态个数
         self.V = [0] * self.state_num   # 初始化每个状态的价值为0
-        self.pi = [[0.25, 0.25, 0.25, 0.25] for i in range(self.state_num)]     # 初始化每个状态的策略为均匀随机
+        self.pi = [[0.25, 0.25, 0.25, 0.25] for i in range(self.state_num)]     # 初始化每个状态的策略为均匀随机，每个状态s采取动作a的概率分布
 
     def policy_evaluation(self):
         cnt = 1     # 计数器
@@ -24,33 +24,35 @@ class PolicyIteration:
             max_diff = 0
             new_V = [0] * self.state_num
             for s in range(self.state_num):
-                Q = []  # 当前状态下所有动作对应的Q(s, a)
+                Q_list = []  # 当前状态下所有动作对应的Q(s, a)
                 for a in range(4):
-                    q = 0
+                    Q = 0
+                    # 遍历s'，trans为转移到不同状态s_next的概率p和奖励r
                     for trans in self.env.P[s][a]:
                         p, s_next, r, done = trans
-                        q += p * (r + self.gamma * self.V[s_next] * (1 - done))
-                    Q.append(self.pi[s][a] * q)
-                new_V[s] = sum(Q)   # Q求和得到V
-                max_diff = max(max_diff, abs(new_V[s] - self.V[s]))
+                        # 对不同的状态进行累加，根据公式更新，这里的奖励与下一个状态有关
+                        Q += p * r + self.gamma * p * self.V[s_next] * (1 - done)
+                    Q_list.append(self.pi[s][a] * Q)
+                new_V[s] = sum(Q_list)   # Q对a求和得到当前状态的V
+                max_diff = max(max_diff, abs(new_V[s] - self.V[s])) # V^{k+1} - V^{k}
             self.V = new_V
-            if max_diff < self.theta:
+            if max_diff < self.theta:   # 两次状态价值函数的差小于阈值时停止迭代
                 break
             cnt += 1
         print(f"Finished policy evaluation after {cnt} rounds.")
 
     def policy_improvement(self):
         for s in range(self.state_num):
-            Q = []
+            Q_list = []
             for a in range(4):
-                q = 0
+                Q = 0
                 for trans in self.env.P[s][a]:
                     p, s_next, r, done = trans
-                    q += p * (r + self.gamma * self.V[s_next] * (1 - done))
-                Q.append(q)
-            max_q = max(Q)
-            cnt_max_q = Q.count(max_q)  # 计算有几个动作得到了最大的Q
-            self.pi[s] = [1 / cnt_max_q if q == max_q else 0 for q in Q]    # 提升策略
+                    Q += p * r + self.gamma * p * self.V[s_next] * (1 - done)
+                Q_list.append(Q)
+            max_Q = max(Q_list)
+            cnt_max_Q = Q_list.count(max_Q)  # 计算有几个动作得到了最大的Q
+            self.pi[s] = [1 / cnt_max_Q if Q == max_Q else 0 for Q in Q_list]    # 提升策略
         print("Finished policy improvement")
         return self.pi
 
@@ -78,14 +80,14 @@ class ValueIteration:
             max_diff = 0
             new_V = [0] * self.state_num
             for s in range(self.state_num):
-                Q = []
+                Q_list = []
                 for a in range(4):
-                    q = 0
+                    Q = 0
                     for trans in self.env.P[s][a]:
                         p, s_next, r, done = trans
-                        q += p * (r + self.gamma * self.V[s_next] * (1 - done))
-                    Q.append(q)
-                new_V[s] = max(Q)   # 选择最大的Q作为新的V
+                        Q += p * (r + self.gamma * self.V[s_next] * (1 - done))
+                    Q_list.append(Q)
+                new_V[s] = max(Q_list)   # 选择最大的Q作为新的V，进行一步策略更新
                 max_diff = max(max_diff, abs(new_V[s] - self.V[s]))
             self.V = new_V
             if max_diff < self.theta:
@@ -96,16 +98,16 @@ class ValueIteration:
 
     def get_policy(self):
         for s in range(self.state_num):
-            Q = []
+            Q_list = []
             for a in range(4):
-                q = 0
+                Q = 0
                 for trans in self.env.P[s][a]:
                     p, s_next, r, done = trans
-                    q += p * (r + self.gamma * self.V[s_next] * (1 - done))
-                Q.append(q)
-            max_q = max(Q)
-            cnt_max_q = Q.count(max_q)  # 计算有几个动作得到了最大的Q
-            self.pi[s] = [1 / cnt_max_q if q == max_q else 0 for q in Q]    # 提升策略
+                    Q += p * r + self.gamma * p * self.V[s_next] * (1 - done)
+                Q_list.append(Q)
+            max_Q = max(Q_list)
+            cnt_max_Q = Q_list.count(max_Q)  # 计算有几个动作得到了最大的Q
+            self.pi[s] = [1 / cnt_max_Q if Q == max_Q else 0 for Q in Q_list]    # 获得策略
 
 
 def print_agent(agent, action_meaning, disaster=None, end=None):
